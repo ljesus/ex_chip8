@@ -29,7 +29,13 @@ defmodule ExChip8.Screen do
   end
 
   defp game_ui(ui_scale, _state) do
-    texture = Texture.build!(:rgb, 64 * ui_scale, 32 * ui_scale) |> Texture.put!(30, 30, :red)
+    texture =
+      Texture.build!(:rgb, 64 * ui_scale, 32 * ui_scale)
+      |> draw_pixel(ui_scale, 0, 0, :red)
+      |> draw_pixel(ui_scale, 0, 31, :blue)
+      |> draw_pixel(ui_scale, 63, 0, :gray)
+      |> draw_pixel(ui_scale, 63, 31, :white)
+
     Scenic.Cache.Dynamic.Texture.put("screen", texture)
 
     [
@@ -39,6 +45,21 @@ defmodule ExChip8.Screen do
         translate: {@debug_width + 10, 5}
       )
     ]
+  end
+
+  defp draw_pixel(texture, ui_scale, x, y, color) do
+    initial_x = x * ui_scale
+    initial_y = y * ui_scale
+
+    initial_x..(initial_x + ui_scale)
+    |> Enum.to_list()
+    |> Enum.reduce(texture, fn x, acc_x ->
+      initial_y..(initial_y + ui_scale)
+      |> Enum.to_list()
+      |> Enum.reduce(acc_x, fn y, acc_y ->
+        Texture.put!(acc_y, x, y, color)
+      end)
+    end)
   end
 
   defp hex_to_string(mem_address), do: "0x" <> Integer.to_string(mem_address, 16)
