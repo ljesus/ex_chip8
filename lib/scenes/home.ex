@@ -40,13 +40,50 @@ defmodule ExChip8.Scene.Home do
         rect_spec({width, height})
       ])
 
-    IO.inspect(x)
+    state = %{
+      graph: graph,
+      memory: ExChip8.Memory.new("/Users/luisjesus/Downloads/IBM Logo.ch8"),
+      pc: 0x200
+    }
 
-    {:ok, graph, push: graph, cpu: %{a: 0, b: 0, c: 0, d: 0, e: 0, f: 0, g: 0, h: 0}}
+    send(self(), :tick)
+
+    {:ok, state, push: graph}
+  end
+
+  def handle_info(:tick, state) do
+    case emulate(state.memory, state.pc) do
+      {:ok, :ok} -> send(self(), :tick)
+      {:error, :stop} -> IO.puts("stop")
+    end
+
+    {:noreply, %{state | pc: state.pc + 2}}
   end
 
   def handle_input(event, _context, state) do
     Logger.info("Received event: #{inspect(event)}")
     {:noreply, state}
+  end
+
+  defp emulate(memory, pc) do
+    try do
+      opcode = binary_part(memory.data, pc, 2)
+      execute(opcode)
+      {:ok, :ok}
+    rescue
+      err ->
+        IO.inspect(err)
+        {:error, :stop}
+    end
+  end
+
+  defp execute(<<0x00E0::16>>) do
+    IO.puts("CLEAR DISPLAY")
+  end
+
+  defp execute(<<0x0000::16>>), do: :ignore
+
+  defp execute(instruction) do
+    IO.puts("TO IMPLEMENT: " <> (instruction |> Base.encode16()))
   end
 end

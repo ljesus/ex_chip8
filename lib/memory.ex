@@ -30,11 +30,23 @@ defmodule ExChip8.Memory do
 
   defstruct [:data]
 
-  def new do
+  def new(rom_filepath) do
     %Memory{
       data: :binary.copy(<<0x0>>, 4096)
     }
     |> init_fonts()
+    |> load_rom(rom_filepath)
+  end
+
+  @doc """
+  Writes a binary string to the memory at the given address.
+  """
+  def write(%Memory{data: data} = memory, address, value)
+      when is_integer(address) and is_bitstring(value) do
+    first = binary_part(data, 0, address)
+    value_length = byte_size(value)
+    second = binary_part(data, address + value_length, byte_size(data) - value_length - address)
+    %{memory | data: first <> value <> second}
   end
 
   defp init_fonts(%Memory{} = memory) do
@@ -138,15 +150,9 @@ defmodule ExChip8.Memory do
     >>)
   end
 
-  @doc """
-  Writes a binary string to the memory at the given address.
-  """
-  def write(%Memory{data: data} = memory, address, value)
-      when is_integer(address) and is_bitstring(value) do
-    first = binary_part(data, 0, address)
-    value_length = byte_size(value)
-    second = binary_part(data, address + value_length, byte_size(data) - value_length)
-    %{memory | data: first <> value <> second}
+  defp load_rom(%Memory{} = memory, rom_filepath) do
+    rom = File.read!(rom_filepath)
+    write(memory, 0x200, rom)
   end
 
   def debug(%Memory{data: data}) do
