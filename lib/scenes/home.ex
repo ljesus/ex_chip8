@@ -3,47 +3,20 @@ defmodule ExChip8.Scene.Home do
   require Logger
 
   alias Scenic.Graph
-  alias Scenic.ViewPort
-
-  import Scenic.Primitives
-  # import Scenic.Components
-
-  @note """
-    This is a very simple starter application.
-
-    If you want a more full-on example, please start from:
-
-    mix scenic.new.example
-  """
-
-  @text_size 24
 
   # ============================================================================
   # setup
 
   # --------------------------------------------------------
-  def init(x, opts) do
-    # get the width and height of the viewport. This is to demonstrate creating
-    # a transparent full-screen rectangle to catch user input
-    {:ok, %ViewPort.Status{size: {width, height}}} = ViewPort.info(opts[:viewport])
-
-    # show the version of scenic and the glfw driver
-    scenic_ver = Application.spec(:scenic, :vsn) |> to_string()
-    glfw_ver = Application.spec(:scenic_driver_glfw, :vsn) |> to_string()
-
-    graph =
-      Graph.build(font: :roboto, font_size: @text_size)
-      |> add_specs_to_graph([
-        text_spec("scenic: v" <> scenic_ver, translate: {20, 40}),
-        text_spec("glfw: v" <> glfw_ver, translate: {20, 40 + @text_size}),
-        text_spec(@note, translate: {20, 120}),
-        rect_spec({width, height})
-      ])
+  def init(_, _) do
+    graph = Graph.build()
 
     state = %{
       graph: graph,
       memory: ExChip8.Memory.new("/Users/luisjesus/Downloads/IBM Logo.ch8"),
-      pc: 0x200
+      pc: 0x200,
+      stopped: false,
+      screen: ExChip8.Screen.new()
     }
 
     send(self(), :tick)
@@ -52,24 +25,55 @@ defmodule ExChip8.Scene.Home do
   end
 
   def handle_info(:tick, state) do
-    case emulate(state.memory, state.pc) do
-      {:ok, :ok} -> send(self(), :tick)
-      {:error, :stop} -> IO.puts("stop")
-    end
+    case state do
+      %{stopped: false} ->
+        opcode =
+          case emulate(state.memory, state.pc) do
+            {:ok, opcode} ->
+              opcode
 
-    {:noreply, %{state | pc: state.pc + 2}}
+            {:error, :stop} ->
+              nil
+          end
+
+        graph =
+          case opcode do
+            nil ->
+              state.graph
+
+            opcode ->
+              render(state, opcode)
+          end
+
+        send(self(), :tick)
+
+        {:noreply, %{state | pc: state.pc + 2, graph: graph, stopped: true}, push: graph}
+
+      _ ->
+        IO.puts("Stopped")
+        {:noreply, state}
+    end
   end
 
   def handle_input(event, _context, state) do
     Logger.info("Received event: #{inspect(event)}")
-    {:noreply, state}
+
+    case event do
+      {:key, {" ", :press, 0}} ->
+        send(self(), :tick)
+        {:noreply, %{state | stopped: false}}
+
+      _ ->
+        {:noreply, state}
+    end
   end
 
   defp emulate(memory, pc) do
     try do
+      # All instructions are 2 bytes long and are stored most-significant-byte first.
       opcode = binary_part(memory.data, pc, 2)
       execute(opcode)
-      {:ok, :ok}
+      {:ok, opcode}
     rescue
       err ->
         IO.inspect(err)
@@ -85,5 +89,9 @@ defmodule ExChip8.Scene.Home do
 
   defp execute(instruction) do
     IO.puts("TO IMPLEMENT: " <> (instruction |> Base.encode16()))
+  end
+
+  defp render(%{screen: screen} = state, opcode) do
+    ExChip8.Screen.display(screen, state, opcode)
   end
 end

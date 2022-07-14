@@ -5,7 +5,7 @@ use Mix.Config
 # Configure the main viewport for the Scenic application
 config :ex_chip8, :viewport, %{
   name: :main_viewport,
-  size: {700, 350},
+  size: {785, 330},
   default_scene: {ExChip8.Scene.Home, nil},
   drivers: [
     %{
