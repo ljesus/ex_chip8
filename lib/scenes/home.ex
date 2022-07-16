@@ -104,10 +104,9 @@ defmodule ExChip8.Scene.Home do
   # Dxyn - DRW Vx, Vy, nibble
   defp execute(%{v: v, i: i} = state, <<0xD::4, x::4, y::4, n::4>>) do
     IO.puts("DRW V#{x}, V#{y}, #{n}")
-    # todo: modulo
-    x_coord = Enum.at(v, x)
-    y_coord = Enum.at(v, y)
-    initial_address = i
+    x_coord = rem(Enum.at(v, x), 63)
+    y_coord = rem(Enum.at(v, y), 31)
+    # initial_address = i
     IO.inspect(x: x_coord, y: y_coord)
     state
   end

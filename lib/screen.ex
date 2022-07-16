@@ -14,7 +14,7 @@ defmodule ExChip8.Screen do
   def new do
     %Screen{
       ui_scale: 10,
-      data: checkered_screen()
+      data: empty_screen()
     }
   end
 
@@ -23,7 +23,7 @@ defmodule ExChip8.Screen do
     |> add_specs_to_graph(debug_ui(state, opcode) ++ game_ui(screen, state))
   end
 
-  defp empty_screen(), do: :binary.copy(<<0x0>>, @num_bits)
+  def empty_screen(), do: :binary.copy(<<0x0>>, @num_bits)
 
   def checkered_screen() do
     0..(@num_bits - 1)
@@ -34,6 +34,27 @@ defmodule ExChip8.Screen do
         1 -> acc <> <<1::1, 0::1, 1::1, 0::1, 1::1, 0::1, 1::1, 0::1>>
       end
     end)
+  end
+
+  def set(%ExChip8.Screen{data: data} = screen, x, y, toggle) do
+    byte_idx = trunc(div(x, 8) + y * (256 / 32))
+    bit_idx = rem(x, 8)
+    IO.puts("#{x}, #{y} is at byte_idx #{byte_idx}, and its bit #{bit_idx} from this byte")
+    first = binary_part(data, 0, byte_idx)
+    modified_byte = binary_part(data, byte_idx, 1) |> modify_bit(bit_idx, toggle)
+
+    second =
+      binary_part(data, byte_idx + 1, byte_size(data) - byte_size(modified_byte) - byte_idx)
+
+    %{screen | data: first <> modified_byte <> second}
+  end
+
+  def modify_bit(byte, bit_idx, value) do
+    f = 7 - bit_idx
+    new_byte = <<0::size(bit_idx), value::1, 0::size(f)>>
+    modified = :crypto.exor(byte, new_byte)
+    IO.inspect(before: byte, after: modified, new_byte: new_byte)
+    modified
   end
 
   defp debug_ui(%{pc: pc, memory: memory, i: i, v: v} = _state, opcode) do
@@ -68,7 +89,7 @@ defmodule ExChip8.Screen do
         |> Enum.reduce(acc, fn {value, idx2}, acc ->
           x = rem(byte_idx * 8 + idx2, 64)
           y = div(byte_idx * 8 + idx2, 64)
-          IO.puts("Drawing #{byte_idx}: #{x}, #{y}")
+          # IO.puts("Drawing #{byte_idx}: #{x}, #{y}")
 
           case value do
             <<0::1>> -> draw_pixel(acc, ui_scale, x, y, :black)
