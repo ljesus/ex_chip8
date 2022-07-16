@@ -117,9 +117,8 @@ defmodule ExChip8.Scene.Home do
     x_coord = rem(Enum.at(v, x), 63)
     y_coord = rem(Enum.at(v, y), 31)
 
-    # todo: check if 0..(n-1) instead
     new_screen =
-      1..n
+      0..(n - 1)
       |> Enum.to_list()
       |> Enum.reduce(screen, fn n, new_screen ->
         # Get the Nth byte of sprite data, counting from the memory address in the I register (I is not incremented)
