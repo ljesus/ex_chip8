@@ -49,6 +49,14 @@ defmodule ExChip8.Memory do
     %{memory | data: first <> value <> second}
   end
 
+  @doc """
+  Reads bytes rom the memory at the given address.
+  """
+  def read(%Memory{data: data} = memory, address, bytes) do
+    IO.puts("Reading #{bytes} bytes from address #{address}")
+    binary_part(data, address, bytes)
+  end
+
   defp init_fonts(%Memory{} = memory) do
     write(memory, 0x000, <<
       # 0

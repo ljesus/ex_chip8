@@ -3,6 +3,7 @@ defmodule ExChip8.Scene.Home do
   require Logger
 
   alias Scenic.Graph
+  import ExChip8.Helpers
 
   # ============================================================================
   # setup
@@ -49,7 +50,7 @@ defmodule ExChip8.Scene.Home do
 
         send(self(), :tick)
 
-        {:noreply, %{new_state | pc: state.pc + 2, graph: graph, stopped: true}, push: graph}
+        {:noreply, %{new_state | pc: new_state.pc, graph: graph, stopped: true}, push: graph}
 
       _ ->
         # IO.puts("Stopped")
@@ -74,7 +75,7 @@ defmodule ExChip8.Scene.Home do
     try do
       # All instructions are 2 bytes long and are stored most-significant-byte first.
       opcode = binary_part(memory.data, pc, 2)
-      new_state = execute(state, opcode)
+      new_state = execute(%{state | pc: pc + 2}, opcode)
       {:ok, %{state: new_state, opcode: opcode}}
     rescue
       err ->
@@ -89,10 +90,16 @@ defmodule ExChip8.Scene.Home do
     state
   end
 
-  # Annn - JP addr
+  # Annn - LD I, addr
   defp execute(state, <<0xA::4, nnn::12>>) do
-    IO.puts("JP #{nnn}")
+    IO.puts("LD I,  #{nnn}")
     %{state | i: nnn}
+  end
+
+  # 1nnn - JP addr
+  defp execute(state, <<0x1::4, nnn::12>>) do
+    IO.puts("JP #{nnn}")
+    %{state | pc: nnn}
   end
 
   # 6xkk - LD Vx, byte
@@ -102,20 +109,57 @@ defmodule ExChip8.Scene.Home do
   end
 
   # Dxyn - DRW Vx, Vy, nibble
-  defp execute(%{v: v, i: i} = state, <<0xD::4, x::4, y::4, n::4>>) do
+  defp execute(
+         %{v: v, i: i, memory: memory, screen: screen} = state,
+         <<0xD::4, x::4, y::4, n::4>>
+       ) do
     IO.puts("DRW V#{x}, V#{y}, #{n}")
     x_coord = rem(Enum.at(v, x), 63)
     y_coord = rem(Enum.at(v, y), 31)
-    # initial_address = i
-    IO.inspect(x: x_coord, y: y_coord)
-    state
+
+    # todo: check if 0..(n-1) instead
+    new_screen =
+      1..n
+      |> Enum.to_list()
+      |> Enum.reduce(screen, fn n, new_screen ->
+        # Get the Nth byte of sprite data, counting from the memory address in the I register (I is not incremented)
+        sprite_data = ExChip8.Memory.read(memory, i + n, 1)
+        #  IO.puts("Got sprite data for byte #{n}")
+        # For each of the 8 pixels/bits in this sprite row:
+        get_bits(sprite_data)
+        |> Enum.with_index()
+        |> Enum.reduce(new_screen, fn {bit, idx}, new_screen ->
+          # IO.inspect(bit: bit, idx: idx, x: x_coord + idx, y: y_coord + n)
+          # IO.puts("Drawing bit #{bit} at #{idx} with coord #{x_coord + idx}, #{y_coord + n}")
+          # If the current pixel in the sprite row is on and the pixel at coordinates X,Y on the screen is also on, turn off the pixel and set VF to 1
+          # Or if the current pixel in the sprite row is on and the screen pixel is not, draw the pixel at the X and Y coordinates
+          # If you reach the right edge of the screen, stop drawing this row
+          # Increment X (VX is not incremented)
+          # Increment Y (VY is not incremented)
+          # Stop if you reach the bottom edge of the screen
+          case bit do
+            <<1::1>> -> ExChip8.Screen.set(new_screen, x_coord + idx, y_coord + n, 1)
+            _ -> new_screen
+          end
+        end)
+      end)
+
+    %{state | screen: new_screen}
+  end
+
+  # 7xkk - ADD Vx, byte
+  defp execute(
+         %{v: v} = state,
+         <<0x7::4, x::4, kk::8>>
+       ) do
+    IO.puts("ADD V#{x}, #{kk}")
+    %{state | v: update_v(v, x, Enum.at(v, x) + kk)}
   end
 
   defp execute(state, <<0x0000::16>>), do: state
 
   defp execute(state, instruction) do
     IO.puts("TO IMPLEMENT: " <> (instruction |> Base.encode16()))
-    state
   end
 
   defp render(%{screen: screen} = state, opcode) do

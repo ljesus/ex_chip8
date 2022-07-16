@@ -1,5 +1,6 @@
 defmodule ExChip8.Screen do
   import Scenic.Primitives
+  import ExChip8.Helpers
 
   alias Scenic.Graph
   alias Scenic.Utilities.Texture
@@ -46,6 +47,8 @@ defmodule ExChip8.Screen do
     second =
       binary_part(data, byte_idx + 1, byte_size(data) - byte_size(modified_byte) - byte_idx)
 
+    # todo: collisions
+
     %{screen | data: first <> modified_byte <> second}
   end
 
@@ -53,7 +56,6 @@ defmodule ExChip8.Screen do
     f = 7 - bit_idx
     new_byte = <<0::size(bit_idx), value::1, 0::size(f)>>
     modified = :crypto.exor(byte, new_byte)
-    IO.inspect(before: byte, after: modified, new_byte: new_byte)
     modified
   end
 
@@ -126,11 +128,4 @@ defmodule ExChip8.Screen do
 
   defp hex_to_string(mem_address), do: "0x" <> Integer.to_string(mem_address, 16)
   defp display_binary(binary), do: binary |> Base.encode16()
-
-  def get_bits(data) do
-    bits_in_binary([], data)
-  end
-
-  defp bits_in_binary(bits, <<>>), do: bits
-  defp bits_in_binary(bits, <<x::bits-1, rest::bits>>), do: bits_in_binary(bits ++ [x], rest)
 end
