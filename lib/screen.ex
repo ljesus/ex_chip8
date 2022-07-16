@@ -5,36 +5,77 @@ defmodule ExChip8.Screen do
   alias Scenic.Utilities.Texture
   alias __MODULE__
 
-  @text_size 17
+  @text_size 15
   @debug_width 130
+  @num_bits 256
 
-  defstruct ui_scale: 10
+  defstruct [:ui_scale, :data]
 
   def new do
-    %Screen{}
+    %Screen{
+      ui_scale: 10,
+      data: checkered_screen()
+    }
   end
 
-  def display(%ExChip8.Screen{ui_scale: ui_scale}, state, opcode) do
+  def display(%ExChip8.Screen{} = screen, state, opcode) do
     Graph.build(font: :roboto, font_size: @text_size)
-    |> add_specs_to_graph(debug_ui(state, opcode) ++ game_ui(ui_scale, state))
+    |> add_specs_to_graph(debug_ui(state, opcode) ++ game_ui(screen, state))
   end
 
-  defp debug_ui(%{pc: pc, memory: memory} = _state, opcode) do
+  defp empty_screen(), do: :binary.copy(<<0x0>>, @num_bits)
+
+  def checkered_screen() do
+    0..(@num_bits - 1)
+    |> Enum.to_list()
+    |> Enum.reduce(<<>>, fn idx, acc ->
+      case rem(div(idx * 8, 64), 2) do
+        0 -> acc <> <<0::1, 1::1, 0::1, 1::1, 0::1, 1::1, 0::1, 1::1>>
+        1 -> acc <> <<1::1, 0::1, 1::1, 0::1, 1::1, 0::1, 1::1, 0::1>>
+      end
+    end)
+  end
+
+  defp debug_ui(%{pc: pc, memory: memory, i: i, v: v} = _state, opcode) do
+    origin_x = 20
+    origin_y = 20
+
     [
       rect_spec({@debug_width, 320}, stroke: {1, :white}, translate: {5, 5}),
-      text_spec("pc: " <> hex_to_string(pc), translate: {20, 40}),
-      text_spec("opcode: " <> display_binary(opcode), translate: {20, 40 + @text_size}),
-      text_spec("mem size: #{byte_size(memory.data)}", translate: {20, 40 + @text_size * 2})
+      text_spec("pc: " <> hex_to_string(pc), translate: {origin_x, origin_y}),
+      text_spec("opcode: " <> display_binary(opcode), translate: {origin_x, origin_y + @text_size}),
+      text_spec("mem size: #{byte_size(memory.data)}",
+        translate: {origin_x, origin_y + @text_size * 2}
+      ),
+      text_spec("i: " <> hex_to_string(i), translate: {origin_x, origin_y + @text_size * 3}),
+      text_spec(
+        Enum.with_index(v)
+        |> Enum.reduce("", fn {vx, idx}, acc ->
+          acc <> "v#{hex_to_string(idx)}: " <> hex_to_string(vx) <> "\n"
+        end),
+        translate: {origin_x, origin_y + @text_size * 4}
+      )
     ]
   end
 
-  defp game_ui(ui_scale, _state) do
+  defp game_ui(%ExChip8.Screen{ui_scale: ui_scale, data: data}, _state) do
     texture =
-      Texture.build!(:rgb, 64 * ui_scale, 32 * ui_scale)
-      |> draw_pixel(ui_scale, 0, 0, :red)
-      |> draw_pixel(ui_scale, 0, 31, :blue)
-      |> draw_pixel(ui_scale, 63, 0, :gray)
-      |> draw_pixel(ui_scale, 63, 31, :white)
+      0..(@num_bits - 1)
+      |> Enum.to_list()
+      |> Enum.reduce(Texture.build!(:rgb, 64 * ui_scale, 32 * ui_scale), fn byte_idx, acc ->
+        get_bits(binary_part(data, byte_idx, 1))
+        |> Enum.with_index()
+        |> Enum.reduce(acc, fn {value, idx2}, acc ->
+          x = rem(byte_idx * 8 + idx2, 64)
+          y = div(byte_idx * 8 + idx2, 64)
+          IO.puts("Drawing #{byte_idx}: #{x}, #{y}")
+
+          case value do
+            <<0::1>> -> draw_pixel(acc, ui_scale, x, y, :black)
+            <<1::1>> -> draw_pixel(acc, ui_scale, x, y, :white)
+          end
+        end)
+      end)
 
     Scenic.Cache.Dynamic.Texture.put("screen", texture)
 
@@ -64,4 +105,11 @@ defmodule ExChip8.Screen do
 
   defp hex_to_string(mem_address), do: "0x" <> Integer.to_string(mem_address, 16)
   defp display_binary(binary), do: binary |> Base.encode16()
+
+  def get_bits(data) do
+    bits_in_binary([], data)
+  end
+
+  defp bits_in_binary(bits, <<>>), do: bits
+  defp bits_in_binary(bits, <<x::bits-1, rest::bits>>), do: bits_in_binary(bits ++ [x], rest)
 end
