@@ -49,6 +49,9 @@ defmodule ExChip8.Memory do
     %{memory | data: first <> value <> second}
   end
 
+  def write(memory, address, value) do
+    memory
+  end
   @doc """
   Reads bytes rom the memory at the given address.
   """

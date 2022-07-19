@@ -59,7 +59,7 @@ defmodule ExChip8.Screen do
     modified
   end
 
-  defp debug_ui(%{pc: pc, memory: memory, i: i, v: v} = _state, opcode) do
+  defp debug_ui(%{pc: pc, memory: memory, i: i, v: v, stack: stack} = _state, opcode) do
     origin_x = 20
     origin_y = 20
 
@@ -71,12 +71,15 @@ defmodule ExChip8.Screen do
         translate: {origin_x, origin_y + @text_size * 2}
       ),
       text_spec("i: " <> hex_to_string(i), translate: {origin_x, origin_y + @text_size * 3}),
+      text_spec("stack top: " <> hex_to_string(List.first(stack)),
+        translate: {origin_x, origin_y + @text_size * 4}
+      ),
       text_spec(
         Enum.with_index(v)
         |> Enum.reduce("", fn {vx, idx}, acc ->
           acc <> "v#{hex_to_string(idx)}: " <> hex_to_string(vx) <> "\n"
         end),
-        translate: {origin_x, origin_y + @text_size * 4}
+        translate: {origin_x, origin_y + @text_size * 5}
       )
     ]
   end
@@ -126,6 +129,7 @@ defmodule ExChip8.Screen do
     end)
   end
 
-  defp hex_to_string(mem_address), do: "0x" <> Integer.to_string(mem_address, 16)
+  defp hex_to_string(nil), do: "-"
+  defp hex_to_string(mem_address), do: "0x#{Integer.to_string(mem_address, 16)} (#{mem_address})"
   defp display_binary(binary), do: binary |> Base.encode16()
 end
