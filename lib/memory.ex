@@ -42,7 +42,7 @@ defmodule ExChip8.Memory do
   Writes a binary string to the memory at the given address.
   """
   def write(%Memory{data: data} = memory, address, value)
-      when is_integer(address) and is_bitstring(value) do
+      when is_integer(address) do
     first = binary_part(data, 0, address)
     value_length = byte_size(value)
     second = binary_part(data, address + value_length, byte_size(data) - value_length - address)
@@ -50,13 +50,15 @@ defmodule ExChip8.Memory do
   end
 
   def write(memory, address, value) do
+    IO.inspect(memory: memory, address: address, value: value)
     memory
   end
+
   @doc """
   Reads bytes rom the memory at the given address.
   """
-  def read(%Memory{data: data} = memory, address, bytes) do
-    IO.puts("Reading #{bytes} bytes from address #{address}")
+  def read(%Memory{data: data}, address, bytes) do
+    # IO.puts("Reading #{bytes} bytes from address #{address}")
     binary_part(data, address, bytes)
   end
 

@@ -40,7 +40,7 @@ defmodule ExChip8.Screen do
   def set(%ExChip8.Screen{data: data} = screen, x, y, toggle) do
     byte_idx = trunc(div(x, 8) + y * (256 / 32))
     bit_idx = rem(x, 8)
-    IO.puts("#{x}, #{y} is at byte_idx #{byte_idx}, and its bit #{bit_idx} from this byte")
+    # IO.puts("#{x}, #{y} is at byte_idx #{byte_idx}, and its bit #{bit_idx} from this byte")
     first = binary_part(data, 0, byte_idx)
     modified_byte = binary_part(data, byte_idx, 1) |> modify_bit(bit_idx, toggle)
 
