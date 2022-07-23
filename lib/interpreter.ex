@@ -5,7 +5,7 @@ defmodule ExChip8.Interpreter do
 
   import ExChip8.Helpers
 
-  defstruct [:memory, :pc, :screen, :i, :v, :stack, :running]
+  defstruct [:memory, :pc, :screen, :i, :v, :stack, :keyboard, :running]
 
   def new(rom_path) do
     %Interpreter{
@@ -15,7 +15,8 @@ defmodule ExChip8.Interpreter do
       screen: ExChip8.Screen.new(),
       i: 0x000,
       v: 0x0..0xF |> Enum.map(fn _i -> 0x0 end),
-      stack: []
+      stack: [],
+      keyboard: ExChip8.Keyboard.new()
     }
   end
 

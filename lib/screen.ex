@@ -8,6 +8,7 @@ defmodule ExChip8.Screen do
 
   @text_size 15
   @debug_width 130
+  @key_width 40
   @num_bits 256
 
   defstruct [:ui_scale, :data]
@@ -21,7 +22,9 @@ defmodule ExChip8.Screen do
 
   def display(%ExChip8.Screen{} = screen, state, opcode) do
     Graph.build(font: :roboto, font_size: @text_size)
-    |> add_specs_to_graph(debug_ui(state, opcode) ++ game_ui(screen, state))
+    |> add_specs_to_graph(
+      debug_ui(state, opcode) ++ game_ui(screen, state) ++ keyboard_ui(screen, state)
+    )
   end
 
   def empty_screen(), do: :binary.copy(<<0x0>>, @num_bits)
@@ -77,11 +80,47 @@ defmodule ExChip8.Screen do
       text_spec(
         Enum.with_index(v)
         |> Enum.reduce("", fn {vx, idx}, acc ->
-          acc <> "v#{hex_to_string(idx)}: " <> hex_to_string(vx) <> "\n"
+          acc <> "v#{Integer.to_string(idx, 16)}: " <> hex_to_string(vx) <> "\n"
         end),
         translate: {origin_x, origin_y + @text_size * 5}
       )
     ]
+  end
+
+  defp keyboard_ui(%{ui_scale: ui_scale}, %{keyboard: keyboard}) do
+    root_x = @debug_width + 64 * ui_scale + 15
+    root_y = 5
+
+    [0x1, 0x2, 0x3, 0xC, 0x4, 0x5, 0x6, 0xD, 0x7, 0x8, 0x9, 0xE, 0xA, 0x0, 0xB, 0xF]
+    |> Enum.chunk_every(4)
+    |> Enum.with_index()
+    |> Enum.reduce([], fn {row, row_index}, acc ->
+      acc ++
+        (Enum.with_index(row)
+         |> Enum.reduce([], fn {key, column}, row_acc ->
+           color =
+             case ExChip8.Keyboard.is_key_pressed(keyboard, key) do
+               true -> :green
+               false -> :white
+             end
+
+           row_acc ++
+             [
+               rect_spec({@key_width, @key_width},
+                 fill: color,
+                 stroke: {1, :black},
+                 translate: {root_x + column * @key_width, root_y + row_index * @key_width}
+               ),
+               text_spec(Integer.to_string(key, 16),
+                 fill: :black,
+                 text_align: :center_middle,
+                 translate:
+                   {root_x + column * @key_width + @key_width / 2,
+                    root_y + row_index * @key_width + @key_width / 2}
+               )
+             ]
+         end))
+    end)
   end
 
   defp game_ui(%ExChip8.Screen{ui_scale: ui_scale, data: data}, _state) do
